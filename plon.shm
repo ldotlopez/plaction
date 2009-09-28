@@ -1,0 +1,139 @@
+#!/bin/bash
+# vim:syntax on:
+# vim:set syntax=sh:
+# vim:set ts=4:
+
+# Set safe shell
+unset  LD_LIBRARY_PATH
+export PATH="/sbin:/usr/sbin:/bin:/usr/bin:"
+
+# Plon variables
+declare -xr PLON_0="$(basename -- $0)"
+declare -xr PLON_0_DIRNAME="$(dirname -- "$0")"
+declare -xr PLON_TRUE=0
+declare -xr PLON_FALSE=1
+
+if [ -e "/etc/debian_version" ]; then
+	PLON_OS="debian"
+elif [ -e "/mach_kernel" ]; then
+	PLON_OS="osx"
+else
+	PLON_OS="unknow"
+fi
+declare -xr "$PLON_OS"
+
+
+##################
+# Error handling #
+##################
+declare -a  _PLON_MSGS
+
+# HELP: Associates a message with a code
+# ARGS: (1)Code (2) Message
+# RETURN: True if registration is ok, false otherwise
+function plon_msg_register()
+{
+	local CODE="$1"
+	local MSG="$2"
+
+	plon_is_digit $CODE || return $PLON_FALSE
+
+	_PLON_MSGS[$CODE]="$MSG"
+	return $PLON_TRUE
+}
+
+function plon_msg_get()
+{
+	local CODE="$1"
+	
+	if ! plon_is_digit "$CODE"; then
+		return $PLON_FALSE
+	fi
+	
+	if [ -z "${_PLON_MSGS[$CODE]}" ]; then
+		return $PLON_FALSE
+	fi
+
+	echo ${_PLON_MSGS[$CODE]}
+	return $PLON_TRUE
+}
+
+function plon_error()
+{
+	local CODE="$1"; shift
+	local MSG=$(plon_msg_get "$CODE")
+	MSG="$(printf "$MSG" "$@")"
+
+	if [ -z "$MSG" ]; then
+		cat <<-EOF
+		Undefined exit message (exit code $CODE).
+
+		Please inform $PLON_0 developer to update his program to
+		use error codes.
+		EOF
+
+		exit $E
+	fi
+
+	echo $MSG
+	exit $CODE
+}
+
+function plon_warn()
+{
+	local CODE="$1"
+	local MSG=$(get_msg "$CODE")
+	if [ -z "$MSG" ]; then
+		(
+		cat <<-EOF
+		Undefined exit message (exit code $CODE).
+
+		Please inform $PLON_ME developer to update his program to
+		use error codes.
+		EOF
+		) >&2
+		return $E
+	fi
+	
+	echo $MSG >&2
+	return $CODE
+}
+
+function echo_error ()
+{
+	echo_stderr "$@"
+}
+
+function echo_stderr ()
+{
+	echo "$@" 1>&2
+}
+
+
+################
+# Base support #
+################
+
+# HELP: check if argument is numeric [0..inf]
+# ARGS: (1)String to check
+# Return: true if (1) is numeric
+function plon_is_digit ()
+{
+    [ -z "$1" ] && return $PLON_FALSE
+    echo "$1" | grep -Eq '^[0-9]+$'
+}
+
+# HELP: Check for availability of programs
+# ARGS: (1...)programs to check
+# OUTPUT: First unknow program or empty.
+# RETURN: TRUE if all arguments are found, FALSE if any is missing
+function plon_check_progs()
+{
+	for p in "$@"
+	do
+		[ -z $(which "$p") ] && { echo $p; return $PLON_FALSE; }
+	done
+
+	return $PLON_TRUE
+}
+

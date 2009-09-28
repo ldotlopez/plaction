@@ -1,26 +1,20 @@
 #!/bin/bash
 
-set -e
-PATH="/bin:/sbin:/usr/bin:/usr/sbin"
-
-if [ -z `which ntfsresize` ]; then
-	echo "error: ntfsresize not found"
-	exit 1
+if ! source plon.shm 2>/dev/null; then
+	echo "error: plon.shm not found uin \$PATH"
+	exit 255
 fi
 
+MISSING=$(plon_check_progs ntfsresize grep awk)
+[ -z "$MISSING" ] || { echo_error "Missing program $MISSING";           exit 1; }
+[ $# -eq 1 ]      || { echo_error "usage $PLON_0 device" ;              exit 2; }
+[ -b "$1" ]       || { echo_error "error: $DEV is not a block device" ; exit 3; }
+
+# ntfsrezize reports MB as (bytes/1000/1000)+1
 DEV="$1"
-if [ $# -ne 1 ]; then
-	echo "usage $(basename -- "$0") device"
-	exit 2
-fi
-
-if [ ! -b "$DEV" ]; then
-	echo "error: $DEV is not a block device" >&2
-	exit 3
-fi
-
-# ntfsrezize reports MB as (bytes/1000/1000)+1, we add 10MB
-MINSIZE=$[$(ntfsresize  -i -n "$DEV" | grep 'You might resize at' | awk '{print $5}')+${MB_TO_ADD}000000]
+MB_TO_ADD="100"
+MINSIZE=$[$(LANG=C ntfsresize  -i -n "$DEV" | grep 'You might resize at' | awk '{print $5}')+${MB_TO_ADD}000000]
+[ plon_is_numeric "$MINSIZE" ] || { echo_error "error: unable to get minimun size"; exit 4; }
 
 # Now reduce
 ntfsresize -f -s $MINSIZE "$DEV"

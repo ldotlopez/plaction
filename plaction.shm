@@ -1,0 +1,385 @@
+#!/bin/bash
+# vim:syntax on:
+# vim:set syntax=sh:
+# vim:set ts=4:
+
+unset LD_LIBRARY_PATH
+export PATH="/sbin:/usr/sbin:/bin:/usr/bin:"
+export PLON_PATH="$(dirname -- "$0"):"
+
+declare -xr PLON_FALSE=1
+declare -xr PLON_TRUE=0
+declare -xr PLON_ME="$(basename -- "$0")"
+declare -a  _PLON_MSGS
+
+PLON_OS=""
+[ -e "/etc/debian_version" ] && PLON_OS="debian"
+[ -e "/mach_kernel" ]        && PLON_OS="osx"
+export "$PLON_OS"
+
+_PLON_SYSCONFDIR="$(dirname -- "$0")/"
+
+#
+# Including other SHell Modules (shm files) or configs
+#
+function plon_include() {
+	local SHM="$1"
+ 	for P in ${PLON_PATH//:/ }
+	do
+		local ABSP="$P/$SHM"
+		if [ -r "$ABSP" ]; then
+			source "$ABSP" && return $PLON_TRUE
+		fi
+	done
+	return $PLON_FALSE
+}
+
+function plon_load_cfg() {
+	local FILE="$_PLON_SYSCONFDIR/${1}.cfg"
+
+	if [ -r $FILE ]; then
+		source "$FILE" 2>/dev/null
+		return $?
+	else
+		return $PLON_FALSE
+	fi
+}
+
+#
+# Error/Warning handling
+# Msg handling
+#
+function plon_msg_register() {
+	local CODE="$1"
+	local MSG="$2"
+
+	if ! plon_is_digit $CODE; then
+		return $PLON_FALSE
+	fi
+
+	_PLON_MSGS[$CODE]="$MSG"
+	return $PLON_TRUE
+}
+
+function plon_msg_get() {
+	local CODE="$1"
+	
+	if ! plon_is_digit "$CODE"; then
+		return $PLON_FALSE
+	fi
+	
+	if [ -z "${_PLON_MSGS[$CODE]}" ]; then
+		return $PLON_FALSE
+	fi
+
+	echo ${_PLON_MSGS[$CODE]}
+	return $PLON_TRUE
+}
+
+function plon_error() {
+	local CODE="$1"; shift
+	local MSG=$(plon_msg_get "$CODE")
+	MSG="$(printf "$MSG" "$@")"
+
+	if [ -z "$MSG" ]; then
+		cat <<-EOF
+		Undefined exit message (exit code $CODE).
+
+		Please inform $PLON_ME developer to update his program to
+		use error codes.
+		EOF
+
+		exit $E
+	fi
+
+	echo $MSG
+	exit $CODE
+}
+
+function plon_warn() {
+	local CODE="$1"
+	local MSG=$(get_msg "$CODE")
+	if [ -z "$MSG" ]; then
+		(
+		cat <<-EOF
+		Undefined exit message (exit code $CODE).
+
+		Please inform $PLON_ME developer to update his program to
+		use error codes.
+		EOF
+		) >&2
+		return $E
+	fi
+	
+	echo $MSG >&2
+	return $CODE
+}
+
+function echo_stderr () {
+	echo "$@" 1>&2
+}
+
+#
+# Network related functions
+#
+function plon_net_remote_ip_get() {
+	echo ${SSH_CONNECTION/ */}
+}
+
+function network_host_get_image() {
+	local IP="$(plon_net_remote_ip_get)"
+
+	local IMAGE=""
+	case "$IP" in
+		150.128.184.17[0-1])
+			IMAGE="pc-lnt"
+			;;
+		150.128.184.35)
+			IMAGE="bolgo"
+			;;
+		150.128.184.39)
+			IMAGE="x10"
+			;;
+		*)
+			IMAGE=""
+			;;
+	esac
+
+	echo "$IMAGE"
+}
+
+#
+# Misc. checks
+#
+function plon_is_set() {
+	local VAR="$1"
+	env | grep -q "^${VAR}="
+}
+
+function plon_is_md5() {
+	echo "$@" | grep -qEi '^[a-f0-9]{32}  .+$'
+}
+
+function plon_is_md5_file() {
+	[ -r "$1" -a -r "$1" ] || return $PLON_FALSE
+
+	while read L; do
+		plon_is_md5 $L || return $PLON_FALSE
+	done < "$1"
+
+	return $PLON_TRUE
+}
+
+function plon_is_digit () {
+	[ -z "$1" ] && return $PLON_FALSE
+
+	echo "$1" | grep -Eq '^[0-9]+$'
+}
+
+function plon_is_string() {
+	echo "$1" | grep -Eiq "^[a-z]+$"
+}
+
+#
+# Extending commands
+#
+function plon_dir_ensure_for() {
+	echo_stderr "plon_dir_ensure_for is deprecated, use plon_mkdir_for instead"
+	plon_mkdir_for "$@"
+}
+
+function plon_mkdir() {
+	for i in "$@"
+	do
+		[ -d "$i" ]  || mkdir -p "$i" 2>/dev/null
+		[ $? -eq 0 ] || return $PLON_FALSE
+	done
+}
+
+function plon_mkdir_for() {
+	for i in "$@"
+	do
+		plon_mkdir "$(dirname -- "$i")" || return $PLON_FALSE
+	done
+}
+
+function plon_create_id() {
+	local FMT="$1"
+	[ -z "$FMT" ] && FMT="%Y%m%d-%H%M"
+	date "+$FMT"
+}
+
+function plon_root_ensure() {
+	if [ $(id -ur) -ne 0 ]; then
+		echo_stderr "UID=0 required. aborting"
+		exit 1
+	fi
+}
+
+#function disk_win_drives_list() {
+#	# List of FAT/NTFS drives
+#	OUT=""
+#
+#	for i in $(sfdisk --dump | grep -iE "Id=( 7| b)" | cut -f 1 -d " ")
+#	do
+#		mount -t ntfs,vfat "$i" "/mnt"
+#		M=$?
+#		if [ $M -ne 0 ]; then
+#			continue
+#		fi
+#
+#		if [ -f "/mnt/ntldr" ]; then
+#			OUT="$OUT $i"
+#		fi
+#		umount "/mnt"
+#	done
+#	echo $OUT
+#}
+#
+#function disk_win_drives_count() {
+#	L=$(disk_win_drives_list)
+#	echo $L | tr ' ' '\n' | wc -l
+#}
+#
+#function partition_get_disk() {
+#	local DEV="$1"
+#	local DEV_BNAME="$(basename $DEV)"
+#	local SYSFS_PATH="$(find /sys/block -maxdepth 2 -name "$DEV_BNAME" -type d)"
+#	echo "/dev/$(basename $(dirname -- $SYSFS_PATH))"
+#}
+#
+#
+#function find_filtered() {
+#	find "$@" ! -name ':*' ! -name '.*'
+#}
+#
+#function uniq_name() {
+#	local SOURCE="$1"
+#	local DEST="$2"
+#	local j=1
+#
+#	local D="$(basename "$SOURCE")"
+#	while [ -e "$DEST/$D" ]; do
+#		D="$(printf %03d $j)-$(basename $SOURCE)"
+#	done
+#
+#	echo "$DEST/$D"
+#}
+#
+#function dir_touched_within() {
+#	local DIR="$1"
+#	local DAYS="$2"
+#
+#	# No hay ficheros modificados en menos de $DAYS dias
+#	if [ -z "$(find_filtered "$DIR" -mtime -$DAYS)" ]; then
+#		return $PLON_FALSE
+#	else
+#		return $PLON_TRUE
+#	fi
+#}
+#
+#function dir_accessed_within() {
+#	local DIR="$1"
+#	local DAYS="$2"
+#
+#	# No hay ficheros modificados en menos de $DAYS dias
+#	if [ -z "$(find_filtered "$DIR" -atime -$DAYS)" ]; then
+#		return $PLON_FALSE
+#	else
+#		return $PLON_TRUE
+#	fi
+#}
+#
+#function sanitize_path() {
+#	local P="$1"
+#	if [ "${P:0:1}" != "/" ]; then
+#		P="$PWD/$P"
+#	fi
+#	echo "$(dirname -- "$P")/$(basename -- "$P")" | sed -e 's,//*,/,g'
+#}
+
+function plon_check_progs () {
+	while [ ! -z "$1" ]; do
+		if [ "$(which "$1")" = "" ]; then
+			echo_stderr "$1 not found, cannot run $0"
+			exit 1
+		fi
+		shift
+	done
+}
+
+function plon_n_cpus () {
+	if [ -r "/proc/cpuinfo" ]; then
+		grep '^processor' /proc/cpuinfo | wc -l | awk '{print $1}'
+	else
+		echo 1
+	fi
+}
+
+<<<<<<< .mine
+function get_msg() {
+	local CODE="$1"
+	
+	if ! is_digit "$CODE"; then
+		return $_BOFH_FALSE
+	fi
+	
+	if [ -z "${_BOFH_MSGS[$CODE]}" ]; then
+		return $_BOFH_FALSE
+	fi
+
+	echo ${_BOFH_MSGS[$CODE]}
+	return $_BOFH_TRUE
+}
+
+function error() {
+	local CODE="$1"
+	local MSG=$(get_msg "$CODE")
+			
+	if [ -z "$MSG" ]; then
+		cat <<-EOF
+		Undefined exit message (exit code $CODE).
+
+		Please inform $(basename $0) developer to update his program to
+		use error codes.
+		EOF
+		
+		exit $E
+	fi
+	
+	echo $MSG
+	exit $CODE
+}
+
+function warn() {
+	local CODE="$1"
+	local MSG=$(get_msg "$CODE")
+	if [ -z "$MSG" ]; then
+		(
+		cat <<-EOF
+		Undefined exit message (exit code $CODE).
+
+		Please inform $(basename -- "$0") developer to update his program to
+		use error codes.
+		EOF
+		) >&2
+		return $E
+	fi
+	
+	echo $MSG >&2
+	return $CODE
+}
+
+function kill_with_children() {
+	local PARENT="$1"
+
+	for i in $(ps -o ppid,pid | grep "^ $PARENT " | awk '{print $2}')
+	do
+		kill_with_children $i
+	done
+
+	kill -TERM $PARENT
+}
+#if [ "$PLON_MOD" ]; then
+#	plon_load_cfg "$PLON_MOD"
+#fi
