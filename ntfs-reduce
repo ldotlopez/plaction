@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -e
+PATH="/bin:/sbin:/usr/bin:/usr/sbin"
+
+if [ -z `which ntfsresize` ]; then
+	echo "error: ntfsresize not found"
+	exit 1
+fi
+
+DEV="$1"
+if [ $# -ne 1 ]; then
+	echo "usage $(basename -- "$0") device"
+	exit 2
+fi
+
+if [ ! -b "$DEV" ]; then
+	echo "error: $DEV is not a block device" >&2
+	exit 3
+fi
+
+# ntfsrezize reports MB as (bytes/1000/1000)+1, we add 10MB
+MINSIZE=$[$(ntfsresize  -i -n "$DEV" | grep 'You might resize at' | awk '{print $5}')+${MB_TO_ADD}000000]
+
+# Now reduce
+ntfsresize -f -s $MINSIZE "$DEV"
+exit $?
+

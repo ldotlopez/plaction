@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -e
+PATH="/bin:/sbin:/usr/bin:/usr/sbin"
+
+if [ -z `which ntfsresize` ]; then
+	echo "error: ntfsresize not found"
+	exit 1
+fi
+
+DEV="$1"
+if [ $# -ne 1 ]; then
+	echo "usage $(basename -- "$0") device"
+	exit 2
+fi
+
+if [ ! -b "$DEV" ]; then
+	echo "error: $DEV is not a block device" >&2
+	exit 3
+fi
+
+PARTSIZE=$(ntfsresize -i "$DEV" | grep '^Current device size' | awk '{print $4}')
+
+# Now expand
+ntfsresize -f -s "$PARTSIZE" "$DEV"
+
