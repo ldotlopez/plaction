@@ -1,0 +1,13 @@
+#!/bin/bash
+
+
+ME="dump-flash-buffers"
+T=${TMPDIR:-/tmp}
+D="$(mktemp -d $T/$ME-XXXXXX)"
+for i in $( lsof -n | grep Flas | awk '{printf "/proc/%s/fd/%s\n", $2, $4}' | sed -e 's,.$,,')
+do
+	F="$(echo $i | tr '/' '_')"
+	echo -ne "Dumping $i to '$D/$F'..."
+	cat $i > "$D/$F"
+	echo "done"
+done
