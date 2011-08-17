@@ -1,0 +1,9 @@
+Misc scripts
+
+- plaction.shm and plon.shm: Support files
+- ntfs-expand: Expands a NTFS partition to its maximum size
+- ntfs-reduce: Reduces a NTFS partition to its minimum size plus 10 percent
+- mbox2sqlite.rb: Convert a mbox file to a sqlite database
+- cover-fetch.py: Download covers from MP3/OGG/FLAC sources
+- cover-fetch-alt.pl: (Older) Alternative to cover-fetch.py
+- dump-flash-buffers: Dumps buffers from flash player (video usally) to disk
