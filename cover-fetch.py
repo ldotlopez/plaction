@@ -128,7 +128,7 @@ def fetch_url_simple(url, referer = 'http://www.last.fm'):
 	return buff
 
 def fetch_cover(tagdict):
-	if not all(tagdict[i] != None for i in ('artist','album')):
+	if not all(tagdict[i] is not None for i in ('artist','album')):
 		raise Exception("Missing tags")
 
 	url = 'http://www.last.fm/music/%s/%s' % (urllib.quote(tagdict['artist'].encode('utf-8')), urllib.quote(tagdict['album'].encode('utf-8')))
