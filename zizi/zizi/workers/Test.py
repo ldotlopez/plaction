@@ -6,32 +6,49 @@ class Test(Worker):
 	def __init__(self, *args, **kw):
 		Worker.__init__(self, *args, **kw)
 
+	def usage(self):
+		return Message(body = """
+			Usage:
+			list    -> List current torrent list
+			add uri -> Adds an URI to transmission and starts it
+			""")
+
+	"""
+	list current torrents
+	"""
 	@accepts(object)
 	def list(self):
-		return "<empty list>"
+		return Message(body = "<empty list>")
 
+	"""
+	Adds an URI to transmission
+	"""
 	@accepts(object, int)
 	def add(self, uri):
-		return "URI %s added" % uri
+		return Message(body = "URI %s added" % uri)
 
-	def map(self):
+	def amap(self):
 		return { 'list' : self.list, 'add' : self.add }
 
-	def run(self, args):
-		cmd = args.pop(0)
+	def run(self, cmd, args):
+		#cmd = args.pop(0)
 
-		assert(cmd in ('list', 'add'))
+		if not cmd in ('list', 'add'):
+			return self.usage()
 
-		ret = None
+		msg = None
 		if cmd == 'list':
-			ret = self.list()
+			msg = self.list()
 
 		elif cmd == 'add':
-			ret = self.add(int(args[0]))
+			try:
+				msg = self.add(int(args[0]))
+			except (IndexError, TypeError, ValueError) as e:
+				return self.usage()
 
 		else:
 			return None
 
-		if ret is not None:
-			return Message(body = ret, final = True)
+		if msg is not None:
+			return msg
 

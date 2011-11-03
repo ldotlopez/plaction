@@ -40,7 +40,7 @@ class Zizi:
 		except ImportError as e:
 			raise Zizi.WorkerLoadException, _("module doesn't exists")
 		except AttributeError as e:
-			raise Zizi.WorkerLoadException, _("module doesn't implement class")
+			raise Zizi.WorkerLoadException, _("module doesn't implement class %s" % worker_name)
 
 		self._workers.append(worker)
 		self._workers_map[worker_name] = worker
@@ -56,34 +56,16 @@ class Zizi:
 		except KeyError:
 			raise Zizi.NotImplemented, _("worker not available")
 		else:
-			return self.execute_worker(worker, args)
-
-	def execute_worker(self, worker, args):
-		if len(args) == 0:
-			print worker.usage()
-			return
-
-		if hasattr(worker, 'map') and callable(getattr(worker, 'map')):
-			m = getattr(worker, 'map')()
-			(action, args2) = (args[0], args[1:])
-			if m.has_key(action) and callable(m[action]):
-				try:
-					return m[action](*args2)
-				except TypeError as e:
-					print worker.usage()
-					return
-
-		try:
-			return worker.run(args)
-		except TypeError as e:
-			print worker.usage()
+			return worker.execute(args)
 
 if __name__ == '__main__':
 	#load_mods = ['WorkerA', 'WorkerB' ]
 	load_mods = ['Test' ]
 
 	z = Zizi(load_mods)
-	print z.execute(sys.argv[1:])
+	msg = z.execute(sys.argv[1:])
+	if msg is not None:
+		print "Result: %s" % msg.body
 	sys.exit(0)
 
 	workers = []
