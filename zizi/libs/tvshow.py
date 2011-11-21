@@ -79,14 +79,14 @@ def rename_file(filepath, output_fmt = "%(name)s - %(season)dx%(episode)02d %(ti
 	newbasename = tmp + os.path.splitext(os.path.basename(filepath))[1]
 	newfilepath = os.path.join(os.path.dirname(filepath), newbasename)
 
-	print repr(data)
-	print "In:  %s" % filepath
-	print "Out: %s" % newfilepath
+	#print repr(data)
+	#print "In:  %s" % filepath
+	#print "Out: %s" % newfilepath
 
 	if filepath == newfilepath:
 		raise RenameError('Source and destination files are the same')
 	if os.path.exists(newfilepath):
 		raise RenameError('Destination file already exists')
-#
-	#shutil.move(filepath, newfilepath)
+
+	shutil.move(filepath, newfilepath)
 
