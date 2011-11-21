@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 import zizi
+import zizi.workers
 from zizi.messages import Message
 import sys
+import os
 
 def _(s):
 	return s
@@ -21,9 +23,13 @@ class Zizi:
 		self._workers = []
 		self._workers_map = {}
 
+		if len(load_mods) == 0:
+			load_mods =  [ x[:-3] for x in os.listdir(zizi.workers.__path__[0]) if x.endswith('.py') and not x.startswith('__') ]
+
 		for worker_name in load_mods:
 			try:
 				self._load_worker(worker_name)
+				self.log(Zizi.INFO, _("Loaded worker %s") % worker_name)
 			except Zizi.WorkerLoadException as e:
 				self.log(Zizi.WARN, _("Unable to load worker %s: %s") % (worker_name, e))
 
@@ -58,12 +64,24 @@ class Zizi:
 		else:
 			return worker.execute(args)
 
-if __name__ == '__main__':
-	#load_mods = ['WorkerA', 'WorkerB' ]
-	load_mods = ['Test' ]
+	def get_global_usage(self):
+		ret = dict()
+		for (name,worker) in self._workers_map.iteritems():
+			ret[name] = worker.usage().body
+		return ret
 
-	z = Zizi(load_mods)
-	msg = z.execute(sys.argv[1:])
+if __name__ == '__main__':
+	z = Zizi([])
+	try:
+		msg = z.execute(sys.argv[1:])
+	except Zizi.InvalidArgumentCount:
+		for (mod, usage) in z.get_global_usage().iteritems():
+			print "Module %s:" % mod
+			print "----------"
+			print usage
+			print
+		sys.exit(1)
+
 	if msg is not None:
 		print "Result: %s" % msg.body
 	sys.exit(0)
