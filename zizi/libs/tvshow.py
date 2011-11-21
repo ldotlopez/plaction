@@ -51,7 +51,7 @@ def normalize_title(title, teams = TEAMS, formats = FORMATS):
 Splits filename into 4 parts:
 Show name, season number (as int), episode number (as int) and episode title
 """
-def split_info(filename, teams = TEAMS, formats = FORMATS):
+def split_info(filename, replacements = {}, teams = TEAMS, formats = FORMATS):
 	basename = os.path.basename(filename)
 	name = os.path.splitext(basename)[0].lower()
 
@@ -60,7 +60,7 @@ def split_info(filename, teams = TEAMS, formats = FORMATS):
 		raise ParseError('Unable to parse string')
 
 	return ( \
-		normalize_show_name(m.group(1)),
+		normalize_show_name(m.group(1), replacements),
 		int(m.group(3) or m.group(5)), \
 		int(m.group(4) or m.group(6)), \
 		normalize_title(m.group(7)))
@@ -68,7 +68,7 @@ def split_info(filename, teams = TEAMS, formats = FORMATS):
 """
 Renames file
 """
-def rename_file(filepath, output_fmt = "%(name)s - %(season)dx%(episode)02d %(title)s",  teams = TEAMS, formats = FORMATS):
+def rename_file(filepath, replacements = {}, output_fmt = "%(name)s - %(season)dx%(episode)02d %(title)s",  teams = TEAMS, formats = FORMATS):
 	(show, season, episode, title) = split_info(filepath)
 	data = {'name':show , 'season':season, 'episode':episode, 'title':title}
 
