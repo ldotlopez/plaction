@@ -1,0 +1,57 @@
+#!/usr/bin/python
+
+import re
+import sys
+import urllib
+import urlparse
+import bs4
+import base64 
+import mimetypes
+
+def compact(s):
+    return re.sub(r'/\s+/ /g', ' ', str(s).replace('\n',''))
+
+def pack(s):
+    repls = {
+        'img'  : ('src' ,),
+        'link' : ('href',)
+    }
+
+    soup = bs4.BeautifulSoup(s)
+    for tag in soup.find_all(lambda tag: tag.name in repls.keys()):
+        for attr in repls[tag.name]:
+            try:
+                extern = tag[attr]
+
+                # Open extern file
+                p = urlparse.urlparse(extern)
+                extern_fh = None
+
+                # Almost sure that this is a bad idea
+                #if p.scheme == '':
+                #    extern_fh = open(extern)
+                #
+
+                if p.scheme in ('http', 'https'):
+                    extern_fh = urllib.urlopen(extern)
+                
+                if not extern_fh:
+                    continue
+
+                # Detect mime or fallback
+                (mime, encoding) = mimetypes.guess_type(extern)
+                if not mime:
+                    mime = 'application/octet-stream'
+
+                try:
+                    b64 = "data:%s;base64,%s" % (mime, base64.encodestring(extern_fh.read()).replace('\n', ''))
+                    tag[attr] = b64
+                except IOError:
+                    continue
+
+            except KeyError:
+                continue
+    return str(soup)
+
+print compact(pack(sys.stdin.read()))
+
